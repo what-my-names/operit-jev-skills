@@ -5,6 +5,7 @@
 - 配套插件（ToolPkg，推荐）：https://github.com/what-my-names/operit-jev-bundle
 - 安装：把 `skills/` 下的目录放进客户端的 skills 目录（Operit 为 `/sdcard/Download/Operit/skills/`）
 - 下载：Release v1.0.0 的 `operit-jev-skills-v1.0.0.zip`
+- Jev 官方 API 文档：https://docs.typesafe.ai ｜ 控制台（拿 key）：https://console.typesafe.ai
 - 密钥可选：未配 key 时可用插件侧的本机作答，或 CLI 的 `--dry-run` 离线校验
 
 ---
@@ -95,3 +96,20 @@ TypeSafe 官网明示：**Jev $42 / 十亿 input token**（自称比某大模型
 ## 来源与许可
 
 决策协议与题型规范来自 `wuyoscar/jev-skill`（MIT）及 TypeSafe / OpenRouter 公开接口文档。本插件与技能包为独立实现，请保留上游署名与 MIT 许可。
+
+### 配套 Skill（可选增强，建议一起装）
+- 5 个技能（决策设计 / 动作选择 / 证据定位 / 输出评判 / 批量分类）：https://github.com/what-my-names/operit-jev-skills
+- 仓库布局为 skills/<名>/SKILL.md，也适用于 Claude Code / Cursor / Codex CLI 等支持 skill 的客户端
+- 装了之后插件会**自动检测**，并在系统提示词里写明「先按对应 skill 的规范走，判断仍走 jev_decide」
+
+### Jev API 与实现（想自己接的看这里）
+- 官方文档：https://docs.typesafe.ai （入门 /introduction、快速开始、三种题型、Confidence、Patterns；给 AI 读的全站索引 https://docs.typesafe.ai/llms.txt）
+- 拿 key：https://console.typesafe.ai
+- 两个端点（二选一）：
+  - TypeSafe 官方：POST https://api.typesafe.ai/v1/systemone ，模型 jev-1.13.0，头 Authorization: Bearer $TYPESAFE_API_KEY
+  - OpenRouter：POST https://openrouter.ai/api/alpha/decisions ，模型 typesafe/jev-1.13，头 Authorization: Bearer $OPENROUTER_API_KEY
+- 请求体只有三个顶层字段：{"model": "…", "state": "证据或上下文", "questions": {"q1": {"type": "choice", "instructions": "…", "criteria": {"A": "…", "B": "…"}}}}
+- 响应：{"model": "…", "answers": {"q1": {"choice": "A", "probabilities": {"A": 0.8, "B": 0.2}, "confidence": 0.7}}, "usage": {"input_tokens": …, "output_tokens": …, "cost": …}}
+- 题型字段：Choice → choice / probabilities / confidence；Score → score / probabilities / confidence；Noul → noul（0–1，无 confidence）
+- 实现要点（官方建议）：一题只做一件事，多因子请拆题后在代码里自己加权；独立题在同一请求里并行评估、互不影响，加题几乎不增耗时；用 confidence 做门控（高置信自动执行，低置信转人工复核）
+- 本插件的实现：manifest.json + main.js（系统提示词钩子 / 输入菜单开关 / <jev> 渲染 / 侧边栏面板）+ packages/jev_decide.js（校验 + Tools.Network.httpPost + needs_review + host 兜底）+ packages/jev_reference.js（离线手册）；源码 https://github.com/what-my-names/operit-jev-bundle
